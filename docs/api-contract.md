@@ -139,3 +139,76 @@ Si la cuenta existe, encola un correo con token de un solo uso que expira segun
 Cambia la contrasena e invalida **todas** las sesiones activas del usuario.
 **Response 200** `{ "message": "Contrasena actualizada. Inicia sesion de nuevo." }`
 Errores: 400 `invalid_token` / `expired_token`, 422.
+
+---
+
+## Cuentas (/api/v1/accounts)
+
+Todas las rutas requieren sesion. Las mutaciones (`POST`, `PATCH`) requieren ademas
+`X-CSRF-Token`. Un `user_id` enviado en el cuerpo se rechaza con 422 (mass assignment).
+
+### Modelo
+- `name`: texto cifrado en reposo. La unicidad es **por usuario, solo entre cuentas
+  activas** e **insensible a mayusculas/espacios** (`"Mi Cuenta"` == `"  mi   cuenta "`).
+  Al archivar una cuenta su nombre puede reutilizarse.
+- `account_type`: `bank`, `savings`, `debit_card`, `credit_card`, `digital_wallet`,
+  `cash`, `other` (tabla `account_types`).
+- `currency_code`: moneda activa (`COP`, `USD`, `EUR`).
+- `opening_balance`: decimal como **string** con la escala de la moneda (COP/USD/EUR: 2).
+  Solo `credit_card` admite valores negativos.
+- `is_archived` / `archived_at`: el archivo es logico; conserva el historial.
+
+### GET /accounts
+Query: `include_archived` (bool, por defecto `false`), `page` (>=1), `page_size` (1..100,
+por defecto 20). Orden: `created_at DESC, id DESC`.
+
+**Response 200**
+```json
+{
+  "items": [
+    {
+      "id": "3f0f...",
+      "name": "Efectivo",
+      "account_type": "cash",
+      "currency_code": "COP",
+      "opening_balance": "1000.00",
+      "is_archived": false,
+      "archived_at": null,
+      "created_at": "2026-10-19T20:00:00Z",
+      "updated_at": "2026-10-19T20:00:00Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 20,
+  "total": 1,
+  "balances": [{ "currency_code": "COP", "balance": "1000.00" }]
+}
+```
+`balances` agrupa por moneda y **siempre excluye cuentas archivadas**, aunque
+`include_archived=true`. Sin movimientos, el saldo es la suma de `opening_balance`.
+
+### POST /accounts
+**Request**
+```json
+{
+  "name": "Efectivo",
+  "account_type": "cash",
+  "currency_code": "COP",
+  "opening_balance": "1000.00"
+}
+```
+**Response 201** igual al item de arriba. Errores: 409 `account_name_taken`,
+422 `invalid_account_type` / `invalid_currency` / `invalid_amount_scale` /
+`negative_opening_balance_not_allowed`, 403 `csrf_failed`.
+
+### GET /accounts/{id}
+**Response 200** item. Cuenta de otro usuario o inexistente: **404** `account_not_found`.
+
+### PATCH /accounts/{id}
+Campos permitidos: `name`, `account_type`, `currency_code` (todos opcionales; al menos uno).
+**Response 200** item. Errores: 404, 409 `account_name_taken`,
+409 `currency_change_not_allowed` si la cuenta ya tiene movimientos, 422.
+
+### POST /accounts/{id}/archive
+Idempotente: si ya estaba archivada responde 200 sin error. **Response 200** item con
+`is_archived: true` y `archived_at`. Errores: 404, 403 `csrf_failed`.

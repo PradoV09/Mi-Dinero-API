@@ -33,6 +33,16 @@ Documento vivo. Describe que se protege, con que mecanismo y que no se cifra.
 - **Outbox de correo**: el fallo del proveedor no rompe el registro; los envios quedan en
   `outbox_emails` con `attempts` y `last_error` para reintentar.
 - **Correos**: SMTP/Mailpit en desarrollo; Resend en produccion (`EMAIL_PROVIDER=resend`).
+- **Cifrado de campos** (`app/core/crypto.py`): AES-256-GCM con nonce aleatorio de 12 bytes.
+  El texto cifrado se guarda como `vN:<base64url(nonce||ciphertext)>`.
+- **Rotacion de clave**: `FIELD_ENCRYPTION_KEY` acepta varias versiones separadas por coma;
+  la primera es la actual (`v2:<clave>,v1:<clave>`). Se descifra con la version indicada en
+  el prefijo, asi que rotar la clave no rompe datos existentes.
+- **Unicidad de nombres cifrados**: como el nonce hace distinto cada cifrado, se guarda
+  `name_fingerprint = HMAC-SHA256(SECRET_KEY, nombre_normalizado)` y un indice unico parcial
+  en `(user_id, name_fingerprint) WHERE is_archived = false`. No se puede buscar por nombre en SQL.
+  **`SECRET_KEY` debe permanecer estable**: rotarla cambia los fingerprints y rompe la deteccion
+  de duplicados sobre cuentas existentes (el cifrado de campos no depende de ella).
 
 ### Exposicion de OpenAPI
 - Por decision del proyecto, `/docs`, `/redoc` y `/openapi.json` estan habilitados en todos los
@@ -41,7 +51,8 @@ Documento vivo. Describe que se protege, con que mecanismo y que no se cifra.
   con una variable de entorno.
 
 ### No implementado todavia
-- Cifrado a nivel de aplicacion de `transactions.description` y `accounts.name` (Fase 2/3).
+- Cifrado a nivel de aplicacion de `transactions.description` (Fase 3); `accounts.name` ya
+  se cifra con el mismo mecanismo.
 - HTTPS obligatorio en produccion (se configura en el proxy/hosting).
 - Filtrado de datos sensibles en logs (revision pendiente; hoy no se registran cuerpos de auth).
 - Rate limiting distribuido: el actual es por proceso; con varias replicas cada una tiene su

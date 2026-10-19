@@ -1,7 +1,7 @@
 # Mi Dinero - API
 
 Backend de la app personal de finanzas (FastAPI / SQLAlchemy async / PostgreSQL).
-Estado: **M2 - autenticacion (registro con confirmacion de correo, login y sesiones)**.
+Estado: **Fase 2 - autenticacion y cuentas (cifrado de nombre, archivo logico y saldos por moneda)**.
 
 Este repositorio contiene solo la API. El frontend (React + Vite) vive en un repositorio aparte.
 
@@ -38,6 +38,14 @@ Endpoints bajo `/api/v1/auth`: `register`, `verify-email`, `resend-verification`
 - En produccion: `EMAIL_PROVIDER=resend` y `EMAIL_PROVIDER_API_KEY` con la clave de Resend.
 - Limpieza de pendientes expirados: `purge_expired_pending_registrations()`
   (`app/services/cleanup.py`), pensada para un cron/job.
+
+## Cuentas
+CRUD bajo `/api/v1/accounts` con `GET` (paginado y saldos agrupados por moneda), `POST`,
+`GET /{id}`, `PATCH /{id}` y `POST /{id}/archive` (idempotente).
+- Nombre cifrado con AES-256-GCM y unicidad por usuario entre cuentas activas.
+- Moneda y escala validadas contra `currencies`; solo tarjetas de credito admiten saldo negativo.
+- Cambio de moneda bloqueado si la cuenta tiene movimientos (se activara en Fase 3).
+- Contrato completo en `docs/api-contract.md`.
 
 ## Pruebas
 Los tests corren contra el PostgreSQL real del compose, usando la base de datos de pruebas

@@ -19,7 +19,7 @@ from app.main import app
 from app.services.email import MemoryEmailProvider
 from tests.conftest import run_alembic
 
-PROTECTED_TABLES = {"alembic_version", "currencies"}
+PROTECTED_TABLES = {"alembic_version", "currencies", "account_types"}
 
 
 def _database_name(url: str) -> str:
