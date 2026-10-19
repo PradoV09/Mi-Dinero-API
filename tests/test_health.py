@@ -11,6 +11,6 @@ def test_health_ok():
     assert r.json() == {"status": "ok"}
 
 
-def test_cors_only_allows_frontend_origin():
+def test_cors_allows_any_origin():
     r = client.get("/health", headers={"Origin": "http://evil.example"})
-    assert "access-control-allow-origin" not in r.headers
+    assert r.headers["access-control-allow-origin"] == "http://evil.example"

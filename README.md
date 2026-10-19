@@ -24,9 +24,9 @@ Revisa `.env` antes de levantar la infraestructura (contiene credenciales fictic
 - Web: `https://midinero.pradov.xyz`
 - API: `https://api-midinero.pradov.xyz`
 
-En el servidor define `FRONTEND_URL=https://midinero.pradov.xyz` y
-`BACKEND_URL=https://api-midinero.pradov.xyz`. CORS solo permite el dominio web, y el correo
-de produccion usa `EMAIL_PROVIDER=resend`.
+En el servidor define `BACKEND_URL=https://api-midinero.pradov.xyz`. CORS acepta
+cualquier origen (sin fijar dominio) y permite credenciales, y el correo de
+produccion usa `EMAIL_PROVIDER=resend`.
 
 ## Pruebas
 Los tests corren contra el PostgreSQL real del compose, usando la base de datos de pruebas
