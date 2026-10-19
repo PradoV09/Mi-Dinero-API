@@ -14,6 +14,12 @@ Documento vivo. Describe que se protege, con que mecanismo y que no se cifra.
   sustituye en `env.py` y no se registra).
 - **Contenedor del backend** (opcional): usuario no root (`uid 10001`), imagen multi-stage.
 
+### Exposicion de OpenAPI
+- Por decision del proyecto, `/docs`, `/redoc` y `/openapi.json` estan habilitados en todos los
+  entornos, incluida produccion. Esto expone el esquema de la API (rutas y modelos), no datos
+  de usuarios. Si mas adelante se quiere restringir, se puede exigir autenticacion o desactivarlo
+  con una variable de entorno.
+
 ### No implementado todavia (se abordara en M2+)
 - Hash de contrasenas (argon2id).
 - Tokens de confirmacion/reset/sesion (SHA-256, un solo uso, expiracion).

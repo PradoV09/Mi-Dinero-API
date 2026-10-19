@@ -1,7 +1,7 @@
 # Contrato de API - Mi Dinero
 
 Base URL de negocio: `/api/v1`. Los endpoints de infraestructura (`/health`) no estan versionados.
-OpenAPI (`/docs`, `/openapi.json`, `/redoc`) solo esta disponible en desarrollo (`ENVIRONMENT=development`).
+OpenAPI esta disponible en `/docs`, `/redoc` y `/openapi.json` en todos los entornos.
 
 ## Convenciones
 
