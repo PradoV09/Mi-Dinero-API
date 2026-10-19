@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 
+import httpx
 import pytest
 import pytest_asyncio
 from sqlalchemy import text
@@ -11,7 +12,11 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
+from app.api.deps import get_db, get_email_provider
 from app.core.config import settings
+from app.core.rate_limit import rate_limiter
+from app.main import app
+from app.services.email import MemoryEmailProvider
 from tests.conftest import run_alembic
 
 PROTECTED_TABLES = {"alembic_version", "currencies"}
@@ -51,6 +56,32 @@ async def db_session(engine) -> AsyncIterator[AsyncSession]:
     factory = async_sessionmaker(engine, expire_on_commit=False)
     async with factory() as session:
         yield session
+
+
+@pytest.fixture
+def email_provider() -> MemoryEmailProvider:
+    return MemoryEmailProvider()
+
+
+@pytest_asyncio.fixture
+async def client(
+    engine, email_provider: MemoryEmailProvider
+) -> AsyncIterator[httpx.AsyncClient]:
+    factory = async_sessionmaker(engine, expire_on_commit=False)
+
+    async def override_get_db() -> AsyncIterator[AsyncSession]:
+        async with factory() as session:
+            yield session
+
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_email_provider] = lambda: email_provider
+    rate_limiter.reset()
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as async_client:
+        yield async_client
+    app.dependency_overrides.clear()
 
 
 @pytest_asyncio.fixture(autouse=True)

@@ -21,11 +21,27 @@ class Settings(BaseSettings):
     secret_key: str = "change-me"
     field_encryption_key: str = "change-me"
 
+    email_provider: str = "smtp"
     smtp_host: str = "127.0.0.1"
     smtp_port: int = 1025
     email_provider_api_key: str = "change-me"
     email_from: str = "no-reply@example.invalid"
     email_verification_ttl_hours: int = 24
+    password_reset_ttl_hours: int = 1
+    session_ttl_hours: int = 720
+    resend_cooldown_seconds: int = 60
+
+    session_cookie_name: str = "mi_dinero_session"
+    csrf_cookie_name: str = "mi_dinero_csrf"
+    csrf_header_name: str = "X-CSRF-Token"
+    cookie_secure: bool = False
+    cookie_samesite: str = "lax"
+
+    rate_limit_login: int = 10
+    rate_limit_register: int = 5
+    rate_limit_resend: int = 3
+    rate_limit_forgot: int = 3
+    rate_limit_window_seconds: int = 3600
 
     @field_validator("database_url", "test_database_url", mode="before")
     @classmethod

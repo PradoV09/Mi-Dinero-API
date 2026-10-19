@@ -1,7 +1,7 @@
 # Mi Dinero - API
 
 Backend de la app personal de finanzas (FastAPI / SQLAlchemy async / PostgreSQL).
-Estado: **M1 - base de datos (PostgreSQL, SQLAlchemy async y Alembic)**.
+Estado: **M2 - autenticacion (registro con confirmacion de correo, login y sesiones)**.
 
 Este repositorio contiene solo la API. El frontend (React + Vite) vive en un repositorio aparte.
 
@@ -27,6 +27,17 @@ Revisa `.env` antes de levantar la infraestructura (contiene credenciales fictic
 En el servidor define `BACKEND_URL=https://api-midinero.pradov.xyz`. CORS acepta
 cualquier origen (sin fijar dominio) y permite credenciales, y el correo de
 produccion usa `EMAIL_PROVIDER=resend`.
+
+## Autenticacion
+Endpoints bajo `/api/v1/auth`: `register`, `verify-email`, `resend-verification`,
+`login`, `logout`, `me`, `forgot-password`, `reset-password`.
+- El registro crea `pending_registrations`; el usuario nace al confirmar el correo.
+- Sesiones en servidor con cookie `HttpOnly`; el contrato completo esta en
+  `docs/api-contract.md`.
+- En desarrollo los correos se capturan en Mailpit: http://127.0.0.1:8025.
+- En produccion: `EMAIL_PROVIDER=resend` y `EMAIL_PROVIDER_API_KEY` con la clave de Resend.
+- Limpieza de pendientes expirados: `purge_expired_pending_registrations()`
+  (`app/services/cleanup.py`), pensada para un cron/job.
 
 ## Pruebas
 Los tests corren contra el PostgreSQL real del compose, usando la base de datos de pruebas
