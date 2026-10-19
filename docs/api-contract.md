@@ -172,6 +172,7 @@ por defecto 20). Orden: `created_at DESC, id DESC`.
       "account_type": "cash",
       "currency_code": "COP",
       "opening_balance": "1000.00",
+      "balance": "1500.00",
       "is_archived": false,
       "archived_at": null,
       "created_at": "2026-10-19T20:00:00Z",
@@ -184,8 +185,10 @@ por defecto 20). Orden: `created_at DESC, id DESC`.
   "balances": [{ "currency_code": "COP", "balance": "1000.00" }]
 }
 ```
+`balance` es el saldo **calculado**: `opening_balance + ingresos - gastos` de los
+movimientos de la cuenta (no se almacena, por lo que no puede desincronizarse).
 `balances` agrupa por moneda y **siempre excluye cuentas archivadas**, aunque
-`include_archived=true`. Sin movimientos, el saldo es la suma de `opening_balance`.
+`include_archived=true`.
 
 ### POST /accounts
 **Request**
@@ -212,3 +215,109 @@ Campos permitidos: `name`, `account_type`, `currency_code` (todos opcionales; al
 ### POST /accounts/{id}/archive
 Idempotente: si ya estaba archivada responde 200 sin error. **Response 200** item con
 `is_archived: true` y `archived_at`. Errores: 404, 403 `csrf_failed`.
+
+---
+
+## Categorias (/api/v1/categories)
+
+Requieren sesion. `POST` requiere `X-CSRF-Token`.
+
+### GET /categories
+Query: `type` (`income`|`expense`, opcional), `page`, `page_size` (1..100, 20 por defecto).
+Devuelve categorias del sistema (`is_system: true`) y las propias del usuario, ordenadas
+por tipo y nombre. Un usuario nunca ve categorias personalizadas de otro.
+
+**Response 200**
+```json
+{
+  "items": [{ "id": "3f0f...", "name": "Salario", "type": "income", "is_system": true }],
+  "page": 1,
+  "page_size": 20,
+  "total": 4
+}
+```
+
+### POST /categories
+**Request** `{ "type": "expense", "name": "Mascotas" }` · **Response 201** item con
+`is_system: false`. Duplicado por tipo y nombre (sin distinguir mayusculas): 409
+`category_name_taken`. Errores: 422, 403 `csrf_failed`.
+
+---
+
+## Movimientos (/api/v1/transactions)
+
+Requieren sesion. `POST`, `PATCH` y `DELETE` requieren `X-CSRF-Token`.
+`POST` y `PATCH` requieren ademas el header **`Idempotency-Key`** (1..128 caracteres).
+
+### Modelo
+- `type`: `income` (suma) o `expense` (resta). El importe siempre es positivo; el signo
+  lo determina el tipo.
+- `amount`: decimal como string, mayor que cero y con la escala de la moneda de la cuenta.
+- `account_id`: cuenta propia y **no archivada** para crear o mover el movimiento.
+- `category_id`: categoria del sistema o propia; su `type` debe coincidir con el movimiento.
+- `currency_code`: se hereda de la cuenta (no se envia).
+- `transaction_date`: `DATE` (`YYYY-MM-DD`), sin hora ni zona.
+- `description`: opcional, maximo 500 caracteres, **cifrada en reposo**.
+
+### GET /transactions
+Filtros: `from` y `to` (inclusive), `account_id`, `category_id`, `type`, `page`,
+`page_size` (1..100, 20 por defecto). Orden: `transaction_date DESC, created_at DESC, id DESC`.
+
+**Response 200**
+```json
+{
+  "items": [
+    {
+      "id": "3f0f...",
+      "type": "expense",
+      "account_id": "9a1e...",
+      "category_id": "7b2c...",
+      "category_name": "Alimentacion",
+      "amount": "30.50",
+      "currency_code": "COP",
+      "transaction_date": "2026-10-15",
+      "description": "Mercado",
+      "created_at": "2026-10-19T20:00:00Z",
+      "updated_at": "2026-10-19T20:00:00Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 20,
+  "total": 1
+}
+```
+`from` mayor que `to`: 422 `invalid_date_range`.
+
+### POST /transactions
+**Request**
+```json
+{
+  "type": "expense",
+  "account_id": "9a1e...",
+  "category_id": "7b2c...",
+  "amount": "30.50",
+  "transaction_date": "2026-10-15",
+  "description": "Mercado"
+}
+```
+**Response 201** item. Errores: 400 `idempotency_key_required` /
+`invalid_idempotency_key`, 404 `account_not_found` / `category_not_found`,
+409 `account_archived`, 422 `category_type_mismatch` / `invalid_amount_scale`.
+
+### PATCH /transactions/{id}
+Actualizacion parcial de `type`, `account_id`, `category_id`, `amount`,
+`transaction_date` y `description` (admite `null` para borrarla). **Response 200** item.
+Errores: 404 `transaction_not_found` / `account_not_found` / `category_not_found`,
+409 `account_archived`, 422, 400 si falta `Idempotency-Key`.
+
+### DELETE /transactions/{id}
+Elimina el movimiento y el saldo se recalcula al consultar. **Response 204** sin cuerpo.
+Errores: 404 `transaction_not_found`, 403 `csrf_failed`.
+
+### Idempotencia
+- Alcance por usuario; la clave se guarda 24 horas.
+- Repetir la misma peticion (misma clave, mismo metodo, ruta y cuerpo) devuelve la
+  respuesta original sin crear ni modificar nada.
+- Misma clave con otro cuerpo/ruta: 409 `idempotency_key_reused`.
+- Peticion simultanea con la misma clave: 409 `idempotency_key_in_progress`.
+- Si la operacion falla, la clave no se consume y puede reintentarse.

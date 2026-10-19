@@ -19,7 +19,11 @@ from app.schemas.account import (
     AccountUpdate,
     BalanceByCurrency,
 )
-from app.services.accounts import account_has_transactions
+from app.services.accounts import (
+    account_balances,
+    account_has_transactions,
+    currency_balances,
+)
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -28,18 +32,28 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _serialize(account: Account, currency: Currency) -> AccountResponse:
+def _serialize(
+    account: Account, currency: Currency, balance: Decimal
+) -> AccountResponse:
     return AccountResponse(
         id=account.id,
         name=decrypt_field(account.name),
         account_type=account.account_type_code,
         currency_code=account.currency_code,
         opening_balance=format_amount(account.opening_balance, currency.minor_units),
+        balance=format_amount(balance, currency.minor_units),
         is_archived=account.is_archived,
         archived_at=account.archived_at,
         created_at=account.created_at,
         updated_at=account.updated_at,
     )
+
+
+async def _balance_for(
+    session: AsyncSession, user_id: uuid.UUID, account_id: uuid.UUID
+) -> Decimal:
+    balances = await account_balances(session, user_id, {account_id})
+    return balances[account_id]
 
 
 async def _owned_account(
@@ -138,24 +152,18 @@ async def list_accounts(
         )
         currencies = {currency.code: currency for currency in rows.scalars()}
 
-    balance_rows = (
-        await session.execute(
-            select(
-                Account.currency_code,
-                Currency.minor_units,
-                func.sum(Account.opening_balance),
-            )
-            .join(Currency, Currency.code == Account.currency_code)
-            .where(Account.user_id == user.id)
-            .where(Account.is_archived.is_(False))
-            .group_by(Account.currency_code, Currency.minor_units)
-            .order_by(Account.currency_code)
-        )
-    ).all()
+    balances = await account_balances(
+        session, user.id, {account.id for account in accounts}
+    )
+    totals = await currency_balances(session, user.id)
 
     return AccountListResponse(
         items=[
-            _serialize(account, currencies[account.currency_code])
+            _serialize(
+                account,
+                currencies[account.currency_code],
+                balances[account.id],
+            )
             for account in accounts
         ],
         page=page,
@@ -164,9 +172,9 @@ async def list_accounts(
         balances=[
             BalanceByCurrency(
                 currency_code=code,
-                balance=format_amount(total_balance or Decimal("0"), minor_units),
+                balance=format_amount(total, minor_units),
             )
-            for code, minor_units, total_balance in balance_rows
+            for code, minor_units, total in totals
         ],
     )
 
@@ -207,7 +215,8 @@ async def create_account(
             409, "account_name_taken", "Ya tienes una cuenta activa con ese nombre"
         ) from exc
     await session.refresh(account)
-    return _serialize(account, currency)
+    balance = await _balance_for(session, user.id, account.id)
+    return _serialize(account, currency, balance)
 
 
 @router.get("/{account_id}", response_model=AccountResponse)
@@ -220,7 +229,8 @@ async def get_account(
     currency = await session.get(Currency, account.currency_code)
     if currency is None:
         raise ApiError(500, "currency_missing", "Moneda de la cuenta no disponible")
-    return _serialize(account, currency)
+    balance = await _balance_for(session, user.id, account.id)
+    return _serialize(account, currency, balance)
 
 
 @router.patch("/{account_id}", response_model=AccountResponse)
@@ -281,7 +291,8 @@ async def update_account(
             409, "account_name_taken", "Ya tienes una cuenta activa con ese nombre"
         ) from exc
     await session.refresh(account)
-    return _serialize(account, currency)
+    balance = await _balance_for(session, user.id, account.id)
+    return _serialize(account, currency, balance)
 
 
 @router.post("/{account_id}/archive", response_model=AccountResponse)
@@ -301,4 +312,5 @@ async def archive_account(
     currency = await session.get(Currency, account.currency_code)
     if currency is None:
         raise ApiError(500, "currency_missing", "Moneda de la cuenta no disponible")
-    return _serialize(account, currency)
+    balance = await _balance_for(session, user.id, account.id)
+    return _serialize(account, currency, balance)

@@ -1,7 +1,7 @@
 # Mi Dinero - API
 
 Backend de la app personal de finanzas (FastAPI / SQLAlchemy async / PostgreSQL).
-Estado: **Fase 2 - autenticacion y cuentas (cifrado de nombre, archivo logico y saldos por moneda)**.
+Estado: **Fase 3 - movimientos y categorias (saldos calculados, filtros e idempotencia)**.
 
 Este repositorio contiene solo la API. El frontend (React + Vite) vive en un repositorio aparte.
 
@@ -45,6 +45,16 @@ CRUD bajo `/api/v1/accounts` con `GET` (paginado y saldos agrupados por moneda),
 - Nombre cifrado con AES-256-GCM y unicidad por usuario entre cuentas activas.
 - Moneda y escala validadas contra `currencies`; solo tarjetas de credito admiten saldo negativo.
 - Cambio de moneda bloqueado si la cuenta tiene movimientos (se activara en Fase 3).
+- Contrato completo en `docs/api-contract.md`.
+
+## Categorias y movimientos
+- `GET /api/v1/categories` (categorias del sistema + propias, filtro `type`) y
+  `POST /api/v1/categories` para categorias personalizadas.
+- CRUD de movimientos en `/api/v1/transactions` con filtros `from`, `to`, `account_id`,
+  `category_id`, `type`, paginacion y **`Idempotency-Key`** obligatorio en `POST`/`PATCH`.
+- El saldo de cada cuenta es **calculado** (`opening_balance + ingresos - gastos`), no se
+  almacena; crear, editar o borrar un movimiento se refleja al instante.
+- `description` cifrada en reposo; importes como string decimal validados contra la moneda.
 - Contrato completo en `docs/api-contract.md`.
 
 ## Pruebas

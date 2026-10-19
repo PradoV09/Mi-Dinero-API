@@ -43,6 +43,14 @@ Documento vivo. Describe que se protege, con que mecanismo y que no se cifra.
   en `(user_id, name_fingerprint) WHERE is_archived = false`. No se puede buscar por nombre en SQL.
   **`SECRET_KEY` debe permanecer estable**: rotarla cambia los fingerprints y rompe la deteccion
   de duplicados sobre cuentas existentes (el cifrado de campos no depende de ella).
+- **Descripciones de movimientos**: `transactions.description` se cifra con el mismo AES-GCM.
+  No se puede filtrar por texto de descripcion en SQL.
+- **Idempotencia cifrada**: las respuestas guardadas en `idempotency_keys.response_body` se
+  cifran (contenian descripciones descifradas e importes), se guardan 24 h y se eliminan con
+  `purge_expired_idempotency_keys()`.
+- **Aislamiento**: toda consulta de cuentas, categorias y movimientos filtra por `user_id` de
+  la sesion; recursos ajenos responden 404. Las categorias del sistema (`user_id NULL`) son
+  visibles para todos, las personalizadas solo para su dueno.
 
 ### Exposicion de OpenAPI
 - Por decision del proyecto, `/docs`, `/redoc` y `/openapi.json` estan habilitados en todos los
@@ -51,8 +59,6 @@ Documento vivo. Describe que se protege, con que mecanismo y que no se cifra.
   con una variable de entorno.
 
 ### No implementado todavia
-- Cifrado a nivel de aplicacion de `transactions.description` (Fase 3); `accounts.name` ya
-  se cifra con el mismo mecanismo.
 - HTTPS obligatorio en produccion (se configura en el proxy/hosting).
 - Filtrado de datos sensibles en logs (revision pendiente; hoy no se registran cuerpos de auth).
 - Rate limiting distribuido: el actual es por proceso; con varias replicas cada una tiene su

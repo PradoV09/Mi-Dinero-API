@@ -20,9 +20,9 @@ URL de pruebas no contiene `test` o coincide con la principal.
   `MemoryEmailProvider`.
 
 ## Cobertura actual
-- 103 pruebas, 93% de lineas/ramas (`--cov-branch`).
+- 120 pruebas, 93% de lineas/ramas (`--cov-branch`).
 - `app/core/money.py`, `security.py`, `config.py` y todos los modelos: 100%.
-- `app/api/v1/auth.py` y `accounts.py`: >90%.
+- `app/api/v1/auth.py`, `accounts.py`, `categories.py` y `transactions.py`: >90%.
 - Sin cubrir: integraciones reales con SMTP/Resend (`app/services/email.py`), handlers de
   error no alcanzables por API y `app/db/session.py`.
 
@@ -32,6 +32,9 @@ Se comprobo que las pruebas detectan regresiones reales:
 - Relajar el `CheckConstraint` de `minor_units` -> falla `test_currency_model.py`.
 - Quitar el filtro `user_id` en `accounts` -> falla el test de aislamiento.
 - Devolver el nombre sin cifrar en `accounts.name` -> falla el test de cifrado.
+- Devolver `transactions.description` sin cifrar -> falla el test de cifrado.
+- Quitar el filtro `user_id` en movimientos -> falla el test de aislamiento.
+- Ignorar `Idempotency-Key` -> falla el test de replay/duplicado.
 
 ## Riesgos aceptados y pendientes
 - **CORS permisivo**: `allow_origin_regex=r".*"` con `allow_credentials=True` (commit

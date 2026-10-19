@@ -19,7 +19,13 @@ from app.main import app
 from app.services.email import MemoryEmailProvider
 from tests.conftest import run_alembic
 
-PROTECTED_TABLES = {"alembic_version", "currencies", "account_types"}
+PRESERVED_TABLES = {
+    "alembic_version",
+    "currencies",
+    "account_types",
+    "categories",
+    "users",
+}
 
 
 def _database_name(url: str) -> str:
@@ -93,8 +99,10 @@ async def clean_database(engine) -> AsyncIterator[None]:
                 "WHERE schemaname = 'public'"
             )
         )
-        tables = [row[0] for row in rows if row[0] not in PROTECTED_TABLES]
+        tables = [row[0] for row in rows if row[0] not in PRESERVED_TABLES]
         if tables:
             quoted = ", ".join(f'"{table}"' for table in tables)
-            await conn.execute(text(f"TRUNCATE TABLE {quoted} RESTART IDENTITY CASCADE"))
+            await conn.execute(text(f"TRUNCATE TABLE {quoted} RESTART IDENTITY"))
+        await conn.execute(text("DELETE FROM categories WHERE user_id IS NOT NULL"))
+        await conn.execute(text("DELETE FROM users"))
     yield

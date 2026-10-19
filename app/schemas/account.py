@@ -88,6 +88,7 @@ class AccountResponse(BaseModel):
     account_type: str
     currency_code: str
     opening_balance: str
+    balance: str
     is_archived: bool
     archived_at: datetime | None
     created_at: datetime
