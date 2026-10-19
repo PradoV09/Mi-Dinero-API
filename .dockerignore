@@ -1,0 +1,12 @@
+.venv
+venv
+__pycache__
+*.pyc
+.pytest_cache
+tests
+backups
+docs
+.env
+docker
+docker-compose.yml
+Makefile
